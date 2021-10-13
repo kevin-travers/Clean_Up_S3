@@ -217,7 +217,5 @@ class Bucket:
         except Exception as e:
             raise e
     
-    def hello(self):
-       print("hello")
 
 
