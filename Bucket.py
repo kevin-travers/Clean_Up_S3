@@ -17,7 +17,7 @@ class Bucket:
         """
         self._bucket_name  = bucket_name
         self._profile      = profile
-        self._thread_count = 10
+        self._thread_count = 50
     
     def threaded(func):
         """
@@ -217,5 +217,31 @@ class Bucket:
         except Exception as e:
             raise e
     
+    def remove_delete_markers(self,prefix=""):
+        try:
+            """
+            bucket              = self.get_all_delete_markers(prefix)
+            objects_queue       = queue.Queue()
+            self.remove_all_delete_markers_helper(objects_queue)
+            for obj in bucket:
+                objects_queue.put(obj)   
+            objects_queue.join()
+            """
+            session = boto3.Session(profile_name=self._profile)
+            s3 = session.resource('s3')
+            client = session.client('s3')
+            client = boto3.session.Session().client('s3')
+            bucket = s3.Bucket(self._bucket_name)
+            versions = bucket.object_versions.filter(Prefix=prefix)  
+            for version in versions.all():
+                try:
+                    version.head()
+                except Exception as e:
+                    print(e.response['ResponseMetadata']['HTTPHeaders'])
+                
+        except Exception as e:
+            raise e
 
 
+
+    
