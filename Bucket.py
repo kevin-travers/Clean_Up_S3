@@ -212,36 +212,67 @@ class Bucket:
             objects_queue       = queue.Queue()
             self.delete_all_bucket_objects_helper(objects_queue)
             for obj in bucket:
+                print(obj)
                 objects_queue.put(obj)   
             objects_queue.join()
         except Exception as e:
             raise e
-    
+    @threaded
+    def remove_all_delete_markers_helper(self,objects_queue,client):
+        while True:
+            try:
+                obj = objects_queue.get()
+                key = obj.key
+                version_id = obj.id
+                print(obj)
+                #check if delete marker
+                if self.is_delete_marker(obj):
+                    
+                    """
+                    versions = client.list_object_versions(Bucket=self._bucket_name, Prefix=key)
+                    for version in versions["Versions"]:
+                        #delete all prevoius versions of the object
+                        version_id = version["VersionId"]
+                        print(key)
+                        #client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
+                    for delete_markers in versions["DeleteMarkers"]:
+                        #delete delete marker
+                        version_id = delete_markers["VersionId"]
+                        print(key)
+                        #client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
+                    #for version in versions:
+                    #    print(version)
+                    #client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
+                    """
+                objects_queue.task_done()
+            except Exception as e:
+                raise e
+    def is_delete_marker(self,version):
+        try:
+            #delte markers will throw error when .haed() called
+            version.head()
+            return False
+        except Exception as e:
+            #check if delete marker
+            if 'x-amz-delete-marker' in e.response['ResponseMetadata']['HTTPHeaders']:
+                return True
+            else:
+                return False
+
     def remove_delete_markers(self,prefix=""):
         try:
-            """
-            bucket              = self.get_all_delete_markers(prefix)
+            
+            bucket              = self.get_all_bucket_versions(prefix)
             objects_queue       = queue.Queue()
             self.remove_all_delete_markers_helper(objects_queue)
             for obj in bucket:
                 objects_queue.put(obj)   
-            objects_queue.join()
-            """
-            session = boto3.Session(profile_name=self._profile)
-            s3 = session.resource('s3')
-            client = session.client('s3')
-            client = boto3.session.Session().client('s3')
-            bucket = s3.Bucket(self._bucket_name)
-            versions = bucket.object_versions.filter(Prefix=prefix)  
-            for version in versions.all():
-                try:
-                    version.head()
-                except Exception as e:
-                    print(e.response['ResponseMetadata']['HTTPHeaders'])
-                
+            objects_queue.join()                
         except Exception as e:
             raise e
 
 
-
+if __name__ == "__main__":
+    bucekt = Bucket("msc-aspera-cloud-backup-prod-us-east-1-981195957711")
+    bucekt.remove_delete_markers("sub/")
     
