@@ -172,9 +172,12 @@ class Bucket:
 
         """
         try:
+            #get objects of s3 bucket with prefix
             bucket              = self.get_bucket_objects(prefix)
             objects_queue       = queue.Queue()
+            #pass queue to threaded method to remove object versions
             self.delete_object_versions_helper(objects_queue)
+            #populate queue with s3 objects
             for obj in bucket:
                 objects_queue.put(obj)
             
@@ -208,9 +211,12 @@ class Bucket:
 
         """
         try:
+            #get objects of s3 bucket with prefix
             bucket              = self.get_all_bucket_versions(prefix)
             objects_queue       = queue.Queue()
+            #pass queue to threaded method to remove objects
             self.delete_all_bucket_objects_helper(objects_queue)
+            #populate queue with s3 objects
             for obj in bucket:
                 print(obj)
                 objects_queue.put(obj)   
@@ -219,35 +225,51 @@ class Bucket:
             raise e
     @threaded
     def remove_all_delete_markers_helper(self,objects_queue,client):
+        """
+        loops through queue of s3 objects and checks if its is latest delete marker and deletes it if delet marker
+
+        Args:
+            objects_queue (queue): queue of objects in s3 bucket
+            client : allows s3 operations to be performed
+
+
+        """
         while True:
             try:
                 obj = objects_queue.get()
                 key = obj.key
                 version_id = obj.id
-                print(obj)
-                #check if delete marker
-                if self.is_delete_marker(obj):
-                    
-                    """
+
+                #check if object is a delete marker
+                if self.is_delete_marker(obj):                  
                     versions = client.list_object_versions(Bucket=self._bucket_name, Prefix=key)
-                    for version in versions["Versions"]:
+                    is_latest = False
+                    #only remove versions if latest versions of object is a delete marker
+                    for delete_marker in versions["DeleteMarkers"]:
+                        if delete_marker["IsLatest"]:
+                            is_latest = True
+                    if is_latest:
                         #delete all prevoius versions of the object
-                        version_id = version["VersionId"]
-                        print(key)
-                        #client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
-                    for delete_markers in versions["DeleteMarkers"]:
-                        #delete delete marker
-                        version_id = delete_markers["VersionId"]
-                        print(key)
-                        #client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
-                    #for version in versions:
-                    #    print(version)
-                    #client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
-                    """
+                        for version in versions["Versions"]:
+                            version_id = version["VersionId"]
+                            client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
+                        #delete delete markers of object
+                        for delete_markers in versions["DeleteMarkers"]:
+                            version_id = delete_markers["VersionId"]
+                            client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
                 objects_queue.task_done()
             except Exception as e:
                 raise e
     def is_delete_marker(self,version):
+        """
+        Checks if the s3 object is a delete marker 
+
+        Args:
+            version (s3 object): s3 object to check if its a delte marker or not
+
+        Returns:
+            boolean: true its a delete marker and false if not delete marker
+        """
         try:
             #delte markers will throw error when .haed() called
             version.head()
@@ -260,11 +282,20 @@ class Bucket:
                 return False
 
     def remove_delete_markers(self,prefix=""):
+        """
+        Add objects to queue and using threads to delete all versions of a object if latest versions is delete marker
+
+        Args:
+            prefix (str, optional): Only get files with prefix example "path/to/sub/folder" . Defaults to "" getting all objects.
+
+        """
         try:
-            
+            #get objects of s3 bucket with prefix
             bucket              = self.get_all_bucket_versions(prefix)
             objects_queue       = queue.Queue()
+            #pass queue to threaded method to remove delete markers
             self.remove_all_delete_markers_helper(objects_queue)
+            #populate queue with s3 objects
             for obj in bucket:
                 objects_queue.put(obj)   
             objects_queue.join()                
@@ -272,7 +303,3 @@ class Bucket:
             raise e
 
 
-if __name__ == "__main__":
-    bucekt = Bucket("msc-aspera-cloud-backup-prod-us-east-1-981195957711")
-    bucekt.remove_delete_markers("sub/")
-    
