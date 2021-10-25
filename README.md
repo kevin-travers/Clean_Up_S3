@@ -27,6 +27,4 @@ bucket.delete_bucket_versions("/path/to/files/")
 bucket.delete_bucket_versions()
 
 
-# returns 'phenomenon'
-foobar.singularize('phenomena')
 ```
