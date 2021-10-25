@@ -218,7 +218,6 @@ class Bucket:
             self.delete_all_bucket_objects_helper(objects_queue)
             #populate queue with s3 objects
             for obj in bucket:
-                print(obj)
                 objects_queue.put(obj)   
             objects_queue.join()
         except Exception as e:
@@ -239,7 +238,6 @@ class Bucket:
                 obj = objects_queue.get()
                 key = obj.key
                 version_id = obj.id
-
                 #check if object is a delete marker
                 if self.is_delete_marker(obj):                  
                     versions = client.list_object_versions(Bucket=self._bucket_name, Prefix=key)
@@ -259,7 +257,8 @@ class Bucket:
                             client.delete_object(Bucket = self._bucket_name, Key = key, VersionId = version_id)
                 objects_queue.task_done()
             except Exception as e:
-                raise e
+                #raise e
+                print(key)
     def is_delete_marker(self,version):
         """
         Checks if the s3 object is a delete marker 
@@ -302,4 +301,7 @@ class Bucket:
         except Exception as e:
             raise e
 
-
+if __name__ == "__main__":
+    bucket = Bucket("msc-aspera-cloud-shared-misc-state-prod-us-east-1-981195957711")
+    bucket.delete_bucket_versions("")
+    #bucket.remove_delete_markers("")
